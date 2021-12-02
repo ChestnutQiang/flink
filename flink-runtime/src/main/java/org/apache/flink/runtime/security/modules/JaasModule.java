@@ -100,7 +100,7 @@ public class JaasModule implements SecurityModule {
 		priorConfig = javax.security.auth.login.Configuration.getConfiguration();
 
 		// construct a dynamic JAAS configuration
-		currentConfig = new DynamicConfiguration(priorConfig);
+		currentConfig = new DynamicConfiguration(priorConfig); // 构建一个动态配置
 
 		// wire up the configured JAAS login contexts to use the krb5 entries
 		AppConfigurationEntry[] krb5Entries = getAppConfigurationEntries(securityConfig);
