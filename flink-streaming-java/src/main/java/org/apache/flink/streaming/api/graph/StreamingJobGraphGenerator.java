@@ -266,10 +266,11 @@ public class StreamingJobGraphGenerator {
 			Map<Integer, List<Tuple2<byte[], byte[]>>> chainedOperatorHashes) {
 
 		if (!builtVertices.contains(startNodeId)) {
-
+			//当前算子链在 JobGraph 中的出边列表，同时也是 createChain() 方法的最终返回值；
 			List<StreamEdge> transitiveOutEdges = new ArrayList<StreamEdge>();
-
+			//当前能够链在一起的 StreamGraph 边列表；
 			List<StreamEdge> chainableOutputs = new ArrayList<StreamEdge>();
+			//当前不能够链在一起的 StreamGraph 边列表
 			List<StreamEdge> nonChainableOutputs = new ArrayList<StreamEdge>();
 
 			StreamNode currentNode = streamGraph.getStreamNode(currentNodeId);
@@ -614,18 +615,24 @@ public class StreamingJobGraphGenerator {
 
 		StreamOperatorFactory<?> headOperator = upStreamVertex.getOperatorFactory();
 		StreamOperatorFactory<?> outOperator = downStreamVertex.getOperatorFactory();
-
-		return downStreamVertex.getInEdges().size() == 1
-				&& outOperator != null
-				&& headOperator != null
-				&& upStreamVertex.isSameSlotSharingGroup(downStreamVertex)
-				&& outOperator.getChainingStrategy() == ChainingStrategy.ALWAYS
-				&& (headOperator.getChainingStrategy() == ChainingStrategy.HEAD ||
-					headOperator.getChainingStrategy() == ChainingStrategy.ALWAYS)
-				&& (edge.getPartitioner() instanceof ForwardPartitioner)
-				&& edge.getShuffleMode() != ShuffleMode.BATCH
-				&& upStreamVertex.getParallelism() == downStreamVertex.getParallelism()
-				&& streamGraph.isChainingEnabled();
+        // 上下游算子实例处于同一个 SlotSharingGroup 中（之后再提）；
+        // 下游算子的链接策略（ChainingStrategy）为 ALWAYS ——既可以与上游链接，也可以与下游链接。我们常见的 map()、filter() 等都属此类；
+        // 上游算子的链接策略为 HEAD 或 ALWAYS。HEAD 策略表示只能与下游链接，这在正常情况下是 Source 算子的专属；
+        // 两个算子间的物理分区逻辑是 ForwardPartitioner ，可参见之前写过的《聊聊Flink DataStream 的八种物理分区逻辑》；
+        // 两个算子间的 shuffle 方式不是批处理模式；
+        // 上下游算子实例的并行度相同；
+        // 没有禁用算子链。
+        return downStreamVertex.getInEdges().size() == 1 // 下游算子入边只有一个
+                && outOperator != null
+                && headOperator != null
+                && upStreamVertex.isSameSlotSharingGroup(downStreamVertex) //上下游算子实例处于同一个 SlotSharingGroup 中
+                && outOperator.getChainingStrategy() == ChainingStrategy.ALWAYS //下游算子的链接策略（ChainingStrategy）为 ALWAYS
+                && (headOperator.getChainingStrategy() == ChainingStrategy.HEAD
+                        || headOperator.getChainingStrategy() == ChainingStrategy.ALWAYS) //上游算子的链接策略为 HEAD 或 ALWAYS
+                && (edge.getPartitioner() instanceof ForwardPartitioner)
+                && edge.getShuffleMode() != ShuffleMode.BATCH //两个算子间的 shuffle 方式不是批处理模式
+                && upStreamVertex.getParallelism() == downStreamVertex.getParallelism() //上下游算子实例的并行度相同
+                && streamGraph.isChainingEnabled(); //没有禁用算子链
 	}
 
 	private void setSlotSharingAndCoLocation() {
